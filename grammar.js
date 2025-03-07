@@ -7,20 +7,12 @@
 /// <reference types="tree-sitter-cli/dsl" />
 // @ts-check
 
-const separated = (t, s) => seq(t, repeat(prec.left(seq(s, t))));
-const comma_separated = (t) => seq(
+const separated = (t, s) => seq(t, repeat(seq(s, t)));
+const comma_separated = (t) => separated(t, ',');
+const comma_newline_separated = ($, t) => seq(
   t,
-  repeat(seq(',', t)),
+  repeat(seq(',', optional($.newline), t)),
 );
-const comma_newline_separated = ($, t) => prec.right(seq(
-  t,
-  repeat(seq(',', optional($._newline), t)),
-));
-
-const optspace = optional(sym('_space'));
-const prespace = t => seq(optspace, t);
-const postspace = t => seq(t, optspace);
-const spaced = t => seq(optspace, t, optspace);
 
 const PREC = {
   CONDITION: 0,
@@ -38,8 +30,6 @@ const PREC = {
   UNARY: 11, // not # - ~
   POWER: 12, // ^
 
-  INVOKE: 13,
-  DEFINE: 14, // idk
   INDEX: 15,
 };
 
@@ -77,8 +67,6 @@ const literals = {
   shebang: $ => seq('#!', field('path', $.shebang_path)),
   shebang_path: $ => new RustRegex('[^\\n]*'),
 
-  _newline: $ => new RustRegex('\\r?\\n'),
-
   _space: $ => token(prec(100, choice(' ', '\t'))),
   comment: $ => prec.right(100, new RustRegex('--[^\\n]*')),
 
@@ -93,11 +81,10 @@ const literals = {
 };
 
 const parse = {
-  block: $ => prec.right(repeat1(choice($._line, $._newline))),
-  _line: $ => seq($.statement, $._newline),
+  block: $ => prec.right(repeat1(choice($.statement, $.newline))),
 
   _body: $ => field('body', choice(
-    seq($._newline, $._indent, $.block, $._outdent),
+    seq($.indent, $.block, $.outdent),
     $.statement,
   )),
   
@@ -127,21 +114,21 @@ const parse = {
     $._body,
   ),
 
-  expr_list: $ => prec.right(comma_separated($._expr)),
+  expr_list: $ => prec.right('explist', prec.right(seq($._expr, prec.right(repeat(seq(',', $._expr)))))),
 
   assignment: $ => seq(
-    field('lhs', $.assignment_lhs),
+    field('lhs', $._assignment_lhs),
     alias('=', $.operator),
-    field('rhs', $.assignment_rhs),
+    field('rhs', $._assignment_rhs),
   ),
 
-  assignment_lhs: $ => comma_separated($._place_expr),
-  _place_expr: $ => choice(alias($.name, $.variable), $.index),
+  _assignment_lhs: $ => comma_separated($._place_expr),
+  _place_expr: $ => prec('var', choice(alias($.name, $.variable), $.index)),
 
   // TODO: foo.bar indexing
   index: $ => prec(PREC.INDEX, seq($._expr, '[', $._expr, ']')),
 
-  assignment_rhs: $ => prec.left(separated($._expr, choice(',', ';'))),
+  _assignment_rhs: $ => prec.left(separated($._expr, choice(',', ';'))),
 
   _expr: $ => choice(
     $._literal,
@@ -193,26 +180,26 @@ const parse = {
     return prec.left(PREC.UNARY, seq(operator, operand));
   },
 
-  invocation: $ => prec(PREC.INVOKE, seq(
+  invocation: $ => prec.right(PREC.INDEX, seq(
     field('function', $._expr),
     field('args', $.invocation_args),
   )),
 
-  invocation_args: $ => choice(
+  invocation_args: $ => prec('call_args', choice(
     $._invocation_arg_list,
     seq('(', optional($._invocation_arg_list), ')'),
     '!',
-  ),
+  )),
 
-  _invocation_arg_list: $ => prec.right(comma_newline_separated($, $._expr)),
+  _invocation_arg_list: $ => prec.right('call_arg_list', comma_newline_separated($, $._expr)),
 
-  definition_args: $ => prec(PREC.DEFINE, choice(
+  definition_args: $ => prec('func_args', choice(
     $.name,
     seq(
       '(',
       comma_separated($.definition_arg),
       // todo: the "using" keyword
-      prespace(')'),
+      ')',
     ),
   )),
   definition_arg: $ => seq(
@@ -220,11 +207,11 @@ const parse = {
     optional(seq('=', field('default', $._expr))),
   ),
 
-  function: $ => seq(
+  function: $ => prec.left('func', seq(
     optional($.definition_args),
     choice('->', '=>'),
-    choice($._body, $._newline),
-  ),
+    optional($._body),
+  )),
 };
 
 const rules = {
@@ -242,20 +229,22 @@ const rules = {
 module.exports = grammar({
   name: "moonscript",
 
-  extras: $ => [$.comment, ' '],
+  extras: $ => [$.comment, /[\s\f\uFEFF\u2060\u200B]|\r?\n/],
 
-  externals: $ => [$._indent, $._outdent],
+  externals: $ => [$.newline, $.indent, $.outdent],
   
   conflicts: $ => [
-    // [$.binary_expr, $.unary_expr, $.invocation],
-    // [$.binary_expr, $.invocation],
-    // [$.invocation, $.definition_arg],
-    // [$.definition_args, $.definition_arg_list],
     // the real conflicts
-    [$.assignment_lhs, $._expr],
-    // [$._place_expr, $.definition_args],
+    [$._assignment_lhs, $._expr],
     [$._place_expr, $.definition_arg],
-    // [$.definition_args, $.invocation_args],
+  ],
+
+  precedences: $ => [
+    ['func', 'call', 'explist'],
+    ['var', 'func_args'],
+    ['call_args'],
+    ['sep'],
+    ['call_arg_list'],
   ],
 
   reserved: {

@@ -5,9 +5,9 @@
 typedef unsigned int uint;
 
 enum TokenType {
+  NEWLINE,
   INDENT,
   OUTDENT,
-  NEWLINE,
 };
 
 typedef struct {
@@ -16,6 +16,10 @@ typedef struct {
 } SerializedScanner;
 
 static void skip(TSLexer * lexer) {
+  lexer->advance(lexer, true);
+}
+
+static void advance(TSLexer * lexer) {
   lexer->advance(lexer, false);
 }
 
@@ -61,92 +65,105 @@ void tree_sitter_moonscript_external_scanner_deserialize(void * payload, const c
 }
 
 bool tree_sitter_moonscript_external_scanner_scan(void * payload, TSLexer * lexer, const bool * valid_symbols) {
+  printf("\n");
+  printf("hi\n");
+  
   Array(uint16_t) * indent_stack = payload;
+  if (indent_stack->size == 0) {
+    printf("WARN: indent stack was empty\n");
+    array_push(indent_stack, 0);
+  }
 
-  lexer->mark_end(lexer);
+  // lexer->mark_end(lexer);
 
   bool found_eol = false;
   uint16_t indent = 0;
-  uint16_t first_comment_indent = 0;
   bool found_first_comment = false;
-  bool done = false;
+  uint16_t first_comment_indent = 0; // todo: whatever man
 
-  while (!done) {
-    switch (lexer->lookahead) {
-      case '\n':
-        found_eol = true;
-        indent = 0;
-        skip(lexer);
-        break;
-
-      case ' ':
-        indent += 1;
-        skip(lexer);
-        break;
-
-      case '\r':
-        indent = 0;
-        skip(lexer);
-        break;
-
-      case '\t':
-        indent += 4;
-        skip(lexer);
-        break;
-
-      case '-':
-        skip(lexer);
-        if (lexer->lookahead == '-') {
-          if (!found_first_comment) {
-            found_first_comment = true;
-          }
-          while (lexer->lookahead != '\0' && lexer->lookahead != '\n') {
-            skip(lexer);
-          }
-        } else {
-          return false;
+  while (true) {
+    char c = lexer->lookahead;
+    if (c == '\n') {
+      printf("hit LF\n");
+      found_eol = true;
+      indent = 0;
+      advance(lexer);
+    } else if (c == ' ') {
+      printf("hit space\n");
+      indent += 1;
+      advance(lexer);
+    } else if (c == '\r' || c == '\f') {
+      printf("hit CR\n");
+      indent = 0;
+      skip(lexer);
+    } else if (c == '\t') {
+      printf("hit tab\n");
+      indent += 4;
+      advance(lexer);
+    } else if (c == '-' && (valid_symbols[INDENT] || valid_symbols[OUTDENT] || valid_symbols[NEWLINE])) {
+      skip(lexer);
+      if (lexer->lookahead == '-') {
+        if (!found_first_comment) {
+          printf("comment\n");
+          found_first_comment = true;
         }
-        break;
-
-      case '\0':
+        while (lexer->lookahead != '\n') {
+          skip(lexer);
+        }
+        skip(lexer);
         indent = 0;
-        found_eol = true;
-        done = true;
-        break;
-
-      default:
-        done = true;
-        break;
+      } else {
+        printf("hit %c after -\n", lexer->lookahead);
+        return false;
+      }
+    } else if (lexer->eof(lexer)) {
+      printf("EOF\n");
+      found_eol = true;
+      indent = 0;
+      lexer->mark_end(lexer);
+      return false;
+      break;
+    } else {
+      printf("hit %c\n", c);
+      break;
     }
   }
 
-  if (!found_eol && indent_stack->size > 0) {
-    uint16_t current_indent = *array_back(indent_stack);
-
-    if (valid_symbols[INDENT] && indent > current_indent) {
-      array_push(indent_stack, indent);
-      lexer->result_symbol = INDENT;
-      lexer->mark_end(lexer);
-      return true;
-    }
-
-    if (
-      (valid_symbols[OUTDENT] /*|| !valid_symbols[NEWLINE]*/) &&
-      indent < current_indent &&
-      (!found_first_comment || first_comment_indent < current_indent)
-    ) {
-      array_pop(indent_stack);
-      lexer->result_symbol = OUTDENT;
-      lexer->mark_end(lexer);
-      return true;
-    }
-
-    if (valid_symbols[NEWLINE]) {
-      lexer->result_symbol = NEWLINE;
-      lexer->mark_end(lexer);
-      return true;
-    }
+  if (!found_eol) {
+    printf("did not find eol\n");
+    return false;
   }
+
+  uint16_t prev_indent = *array_back(indent_stack);
+
+  printf("%b %d %d\n", found_eol, prev_indent, indent);
+  printf("%b %b %b\n", valid_symbols[INDENT], valid_symbols[OUTDENT], valid_symbols[NEWLINE]);
+
+  if (valid_symbols[INDENT] && indent > prev_indent) {
+    printf("indent\n");
+    array_push(indent_stack, indent);
+    lexer->result_symbol = INDENT;
+    return true;
+  }
+
+  if (
+    (valid_symbols[OUTDENT] /*|| !valid_symbols[NEWLINE]*/) &&
+    indent < prev_indent &&
+    (!found_first_comment || first_comment_indent < prev_indent)
+  ) {
+    printf("outdent\n");
+    array_pop(indent_stack);
+    lexer->result_symbol = OUTDENT;
+    return true;
+  }
+
+  if (valid_symbols[NEWLINE]) {
+    printf("newline\n");
+    lexer->result_symbol = NEWLINE;
+    return true;
+  }
+
+  printf("nothing");
 
   return false;
 }

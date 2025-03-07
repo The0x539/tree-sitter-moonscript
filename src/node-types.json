@@ -4,21 +4,69 @@
     "named": true,
     "fields": {
       "lhs": {
-        "multiple": false,
+        "multiple": true,
         "required": true,
         "types": [
           {
-            "type": "assignment_lhs",
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": "index",
+            "named": true
+          },
+          {
+            "type": "variable",
             "named": true
           }
         ]
       },
       "rhs": {
-        "multiple": false,
+        "multiple": true,
         "required": true,
         "types": [
           {
-            "type": "assignment_rhs",
+            "type": "(",
+            "named": false
+          },
+          {
+            "type": ")",
+            "named": false
+          },
+          {
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": ";",
+            "named": false
+          },
+          {
+            "type": "function",
+            "named": true
+          },
+          {
+            "type": "if",
+            "named": true
+          },
+          {
+            "type": "index",
+            "named": true
+          },
+          {
+            "type": "invocation",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          },
+          {
+            "type": "variable",
             "named": true
           }
         ]
@@ -36,71 +84,17 @@
     }
   },
   {
-    "type": "assignment_lhs",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "index",
-          "named": true
-        },
-        {
-          "type": "variable",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "assignment_rhs",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "function",
-          "named": true
-        },
-        {
-          "type": "if",
-          "named": true
-        },
-        {
-          "type": "index",
-          "named": true
-        },
-        {
-          "type": "invocation",
-          "named": true
-        },
-        {
-          "type": "number",
-          "named": true
-        },
-        {
-          "type": "string",
-          "named": true
-        },
-        {
-          "type": "variable",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "block",
     "named": true,
     "fields": {},
     "children": {
       "multiple": true,
-      "required": false,
+      "required": true,
       "types": [
+        {
+          "type": "newline",
+          "named": true
+        },
         {
           "type": "statement",
           "named": true
@@ -242,6 +236,14 @@
             "named": true
           },
           {
+            "type": "indent",
+            "named": true
+          },
+          {
+            "type": "outdent",
+            "named": true
+          },
+          {
             "type": "statement",
             "named": true
           }
@@ -269,6 +271,14 @@
         "types": [
           {
             "type": "block",
+            "named": true
+          },
+          {
+            "type": "indent",
+            "named": true
+          },
+          {
+            "type": "outdent",
             "named": true
           },
           {
@@ -447,6 +457,10 @@
           "named": true
         },
         {
+          "type": "newline",
+          "named": true
+        },
+        {
           "type": "number",
           "named": true
         },
@@ -570,7 +584,15 @@
     "named": false
   },
   {
+    "type": "indent",
+    "named": true
+  },
+  {
     "type": "name",
+    "named": true
+  },
+  {
+    "type": "newline",
     "named": true
   },
   {
@@ -579,6 +601,10 @@
   },
   {
     "type": "operator",
+    "named": true
+  },
+  {
+    "type": "outdent",
     "named": true
   },
   {
