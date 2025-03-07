@@ -39,7 +39,8 @@ const PREC = {
   POWER: 12, // ^
 
   INVOKE: 13,
-  INDEX: 14,
+  DEFINE: 14, // idk
+  INDEX: 15,
 };
 
 const do_stack = [true];
@@ -148,6 +149,7 @@ const parse = {
     $._place_expr,
     // $.binary_expr,
     // $.unary_expr,
+    $.function,
     seq('(', spaced($._expr), ')'),
   ),
 
@@ -201,25 +203,25 @@ const parse = {
     '!',
   )),
 
-  _invocation_arg_list: $ => prec.right(comma_newline_separated($, $._expr),
+  _invocation_arg_list: $ => prec.right(comma_newline_separated($, $._expr)),
 
-  // definition_args: $ => seq(
-  //   '(',
-  //   optional($.definition_arg_list),
-  //   // todo: the "using" keyword
-  //   prespace(')'),
-  // ),
-  // definition_arg_list: $ => comma_separated($.definition_arg),
-  // definition_arg: $ => prec('define', seq(
-  //   $.name,
-  //   optional(seq('=', field('default', $._expr))),
-  // )),
+  definition_args: $ => seq(
+    '(',
+    optional($.definition_arg_list),
+    // todo: the "using" keyword
+    prespace(')'),
+  ),
+  definition_arg_list: $ => comma_separated($.definition_arg),
+  definition_arg: $ => prec(PREC.DEFINE, seq(
+    $.name,
+    optional(seq('=', field('default', $._expr))),
+  )),
 
-  // function: $ => prec.right(seq(
-  //   optional(postspace($.definition_args)),
-  //   choice('->', '=>'),
-  //   optional($._body),
-  // )),
+  function: $ => prec.right(seq(
+    optional(postspace($.definition_args)),
+    choice('->', '=>'),
+    optional($._body),
+  )),
 };
 
 const rules = {
@@ -249,10 +251,6 @@ module.exports = grammar({
     // the real conflicts
     [$.assignment_lhs, $._expr],
     // [$.definition_args, $.invocation_args],
-  ],
-
-  precedences: $ => [
-    ['define', 'invoke']
   ],
 
   reserved: {
