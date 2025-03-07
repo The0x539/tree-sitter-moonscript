@@ -8,13 +8,13 @@
 // @ts-check
 
 const separated = (t, s) => seq(t, repeat(prec.left(seq(s, t))));
-const comma_separated = (t) => prec.left(seq(
+const comma_separated = (t) => seq(
   t,
-  repeat(prec.left(seq(spaced(','), t))),
-));
-const comma_newline_separated = ($, t) => prec.left(seq(
+  repeat(seq(',', t)),
+);
+const comma_newline_separated = ($, t) => prec.right(seq(
   t,
-  repeat(seq(optspace, ',', optspace, optional($._newline), t)),
+  repeat(seq(',', optional($._newline), t)),
 ));
 
 const optspace = optional(sym('_space'));
@@ -79,7 +79,7 @@ const literals = {
 
   _newline: $ => new RustRegex('\\r?\\n'),
 
-  _space: $ => choice(' ', '\t'),
+  _space: $ => token(prec(100, choice(' ', '\t'))),
   comment: $ => prec.right(100, new RustRegex('--[^\\n]*')),
 
   // TODO: remove. adds a cutoff point to the test file, not a part of the actual grammar
@@ -122,35 +122,36 @@ const parse = {
 
   if: $ => seq(
     'if',
-    prespace($._condition),
-    optional(prespace('then')),
+    $._condition,
+    optional('then'),
     $._body,
   ),
 
-  expr_list: $ => comma_separated($._expr),
+  expr_list: $ => prec.right(comma_separated($._expr)),
 
   assignment: $ => seq(
     field('lhs', $.assignment_lhs),
-    prespace(alias('=', $.operator)),
+    alias('=', $.operator),
     field('rhs', $.assignment_rhs),
   ),
 
   assignment_lhs: $ => comma_separated($._place_expr),
   _place_expr: $ => choice(alias($.name, $.variable), $.index),
 
-  index: $ => prec(PREC.INDEX, seq($._expr, '[', spaced($._expr), ']')),
+  // TODO: foo.bar indexing
+  index: $ => prec(PREC.INDEX, seq($._expr, '[', $._expr, ']')),
 
-  assignment_rhs: $ => prec.left(separated(prespace($._expr), choice(',', ';'))),
+  assignment_rhs: $ => prec.left(separated($._expr, choice(',', ';'))),
 
   _expr: $ => choice(
     $._literal,
     $.if,
-    $.invocation,
     $._place_expr,
     // $.binary_expr,
     // $.unary_expr,
     $.function,
-    seq('(', spaced($._expr), ')'),
+    seq('(', $._expr, ')'),
+    $.invocation,
   ),
 
   binary_expr: $ => {
@@ -173,7 +174,7 @@ const parse = {
     
     const binary_expr = (operator) => seq(
       field('lhs', $._expr),
-      spaced(alias(operator, $.operator)),
+      alias(operator, $.operator),
       field('rhs', $._expr),
     );
 
@@ -192,36 +193,38 @@ const parse = {
     return prec.left(PREC.UNARY, seq(operator, operand));
   },
 
-  invocation: $ => prec.right(PREC.INVOKE, seq(
+  invocation: $ => prec(PREC.INVOKE, seq(
     field('function', $._expr),
     field('args', $.invocation_args),
   )),
 
-  invocation_args: $ => prec.right(PREC.INVOKE, choice(
-    seq($._space, $._invocation_arg_list),
+  invocation_args: $ => choice(
+    $._invocation_arg_list,
     seq('(', optional($._invocation_arg_list), ')'),
     '!',
-  )),
+  ),
 
   _invocation_arg_list: $ => prec.right(comma_newline_separated($, $._expr)),
 
-  definition_args: $ => seq(
-    '(',
-    optional($.definition_arg_list),
-    // todo: the "using" keyword
-    prespace(')'),
-  ),
-  definition_arg_list: $ => comma_separated($.definition_arg),
-  definition_arg: $ => prec(PREC.DEFINE, seq(
+  definition_args: $ => prec(PREC.DEFINE, choice(
+    $.name,
+    seq(
+      '(',
+      comma_separated($.definition_arg),
+      // todo: the "using" keyword
+      prespace(')'),
+    ),
+  )),
+  definition_arg: $ => seq(
     $.name,
     optional(seq('=', field('default', $._expr))),
-  )),
+  ),
 
-  function: $ => prec.right(seq(
-    optional(postspace($.definition_args)),
+  function: $ => seq(
+    optional($.definition_args),
     choice('->', '=>'),
-    optional($._body),
-  )),
+    choice($._body, $._newline),
+  ),
 };
 
 const rules = {
@@ -239,17 +242,19 @@ const rules = {
 module.exports = grammar({
   name: "moonscript",
 
-  extras: $ => [$.comment],
+  extras: $ => [$.comment, ' '],
 
   externals: $ => [$._indent, $._outdent],
   
   conflicts: $ => [
     // [$.binary_expr, $.unary_expr, $.invocation],
-    [$.binary_expr, $.invocation],
-    // [$._place_expr, $.definition_arg],
+    // [$.binary_expr, $.invocation],
     // [$.invocation, $.definition_arg],
+    // [$.definition_args, $.definition_arg_list],
     // the real conflicts
     [$.assignment_lhs, $._expr],
+    // [$._place_expr, $.definition_args],
+    [$._place_expr, $.definition_arg],
     // [$.definition_args, $.invocation_args],
   ],
 

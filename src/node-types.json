@@ -122,14 +122,6 @@
         "required": false,
         "types": [
           {
-            "type": "\t",
-            "named": false
-          },
-          {
-            "type": " ",
-            "named": false
-          },
-          {
             "type": "(",
             "named": false
           },
@@ -180,7 +172,7 @@
     }
   },
   {
-    "type": "definition_arg_list",
+    "type": "definition_args",
     "named": true,
     "fields": {},
     "children": {
@@ -190,20 +182,9 @@
         {
           "type": "definition_arg",
           "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "definition_args",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": false,
-      "types": [
+        },
         {
-          "type": "definition_arg_list",
+          "type": "name",
           "named": true
         }
       ]
@@ -300,14 +281,6 @@
         "multiple": true,
         "required": true,
         "types": [
-          {
-            "type": "\t",
-            "named": false
-          },
-          {
-            "type": " ",
-            "named": false
-          },
           {
             "type": "(",
             "named": false
@@ -409,14 +382,6 @@
         "multiple": true,
         "required": true,
         "types": [
-          {
-            "type": "\t",
-            "named": false
-          },
-          {
-            "type": " ",
-            "named": false
-          },
           {
             "type": "(",
             "named": false
@@ -555,14 +520,6 @@
     "type": "string",
     "named": true,
     "fields": {}
-  },
-  {
-    "type": "\t",
-    "named": false
-  },
-  {
-    "type": " ",
-    "named": false
   },
   {
     "type": "!",
