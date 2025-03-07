@@ -12,6 +12,10 @@ const comma_separated = (t) => prec.left(seq(
   t,
   repeat(prec.left(seq(spaced(','), t))),
 ));
+const comma_newline_separated = ($, t) => prec.left(seq(
+  t,
+  repeat(seq(optspace, ',', optspace, optional($._newline), t)),
+));
 
 const optspace = optional(sym('_space'));
 const prespace = t => seq(optspace, t);
@@ -197,10 +201,7 @@ const parse = {
     '!',
   )),
 
-  _invocation_arg_list: $ => prec.right(PREC.INVOKE, seq(
-    $._expr,
-    prec.right(repeat(seq($._expr, spaced(','), optional($._newline)))),
-  )),
+  _invocation_arg_list: $ => prec.right(comma_newline_separated($, $._expr),
 
   // definition_args: $ => seq(
   //   '(',
